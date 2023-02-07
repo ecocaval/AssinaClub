@@ -1,6 +1,5 @@
-# Yarn 
-# Yarn dev
-# Yarn Prisma init
+# Project Original Link:
 
-# after configure planetscale
-# yarn prisma migrate dev
+https://gitlab.com/apostolos-javascript/assina-club
+
+This repo is a backup, view the full project in the gitlab url.
