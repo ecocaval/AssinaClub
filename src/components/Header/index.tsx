@@ -1,69 +1,182 @@
-import { useState } from "react";
-import Link from "next/link";
-import { Router } from "next/router";
-import { Button, Container, Navbar, Offcanvas } from "react-bootstrap";
-
-import { IoMenu } from "react-icons/io5"
+import { useContext, useEffect, useRef, useState } from "react";
 import { GetSessionParams, signOut, useSession } from "next-auth/react";
-import { Subscriber } from "../../@types/SubscriberTypes";
+import { useRouter } from "next/router";
+import Link from "next/link";
 
-interface GetSubscriberData extends GetSessionParams {
+import { ClubDashboardGlobalContext } from "../../contexts/ClubDashboard/ClubDashboardGlobalContext";
+
+import { Subscriber } from "../../@types/SubscriberTypes";
+import { Admin } from "../../@types/AdminsClubProviderTypes";
+import { ClubProvider } from "../../@types/ClubProviderTypes";
+
+import { ADMIN_HEADER_OPTIONS, SUBSCRIBER_HEADER_OPTIONS } from "./utils/headerOptions";
+
+import { DivisionLineWithoutMargin } from "../Divisions/DivisionLine";
+import { IoMenu, IoClose } from "react-icons/io5"
+
+import styles from "./header.module.scss"
+
+interface GetData extends GetSessionParams {
   data: {
-    userData?: Subscriber
+    userData?: Subscriber | Admin | ClubProvider
+    typeOfUser?: string
   }
 }
 
 export function Header() {
-  const session = useSession() as GetSubscriberData
-  let userData
-  if (session.data) {
-    userData = session?.data.userData
-  }
+  const session = useSession() as GetData
+  const router = useRouter()
 
-  const [isOffcanvas, setIsOffcanvas] = useState(false)
+  let [userData, setUserData] = useState<any>(undefined)
+  let [typeOfUser, setTypeOfUser] = useState<string | undefined>(undefined)
 
-  const handleCloseOffcanvas = () => setIsOffcanvas(false)
+  useEffect(() => {
+    if (session.data) {
+      const data = session.data.userData
+      setUserData(data)
+      setTypeOfUser(session.data.typeOfUser)      
+    }
+  }, [session])
+  
+  const { clubProviderInfo } = useContext(ClubDashboardGlobalContext)
+
+  const handleCloseOffcanvas = () => setIsMenuSidebar(false)
+  
+  useEffect(() => {
+    router.events.on('routeChangeComplete', handleCloseOffcanvas);
+
+    return () => {
+      router.events.off('routeChangeComplete', handleCloseOffcanvas);
+    };
+  })
+
+  const loginDropdownRef = useRef(null)
+  const [isLoginDropdown, setIsLoginDropdown] = useState(false)
+  const [isMenuSidebar, setIsMenuSidebar] = useState(false)
 
   return (
     <>
-      <Navbar className="shadow-sm mb-4">
-        <Container className="position-relative py-2">
-          <Navbar.Brand className="d-block" href="/">AssinaClub</Navbar.Brand>
-          <Navbar.Toggle 
-            className="d-block position-absolute top-50 start-100 translate-middle border-0" 
-            onClick={() => setIsOffcanvas(!isOffcanvas)}
+      <header className={`${styles.header} ${isMenuSidebar ? 'active' : ''}`}>
+        <Link href="/" className={styles.logo}>
+            AssinaClub
+        </Link>
+        <nav className="position-relative py-2">
+          <Link 
+            href={'/club_providers/clubs_board'}
+            className="fw-bold"
           >
-            <IoMenu fontSize={50} />  
-          </Navbar.Toggle>
-          <Offcanvas show={isOffcanvas} onHide={handleCloseOffcanvas}>
-            <Offcanvas.Header>
-              <Offcanvas.Title>
-                Olá, {userData ? userData?.name : 'Faça Login'}
-              </Offcanvas.Title>
-            </Offcanvas.Header>
-            <Offcanvas.Body className="d-flex flex-column gap-2">
-            {session.data ? 
-              (
-                <>
-                  <Link href={`/subscriber/dashboard`}>Ver Perfil</Link>
-                  <Link href={`/club_providers/clubs_board`}>Ver todos os Clubes</Link>
-                  <Button 
-                    className="mt-auto" 
-                    variant="danger"
-                    onClick={() => signOut()}
-                  >Sair da Conta</Button>
-                </>
-              )
-            : 
-              <>
-                <Link href={'/login/subscriber'}>Fazer Login</Link>
-                <Link className="mt-auto text-warning" href={'/login/club_provider'}>Sou Administrador de um Clube</Link>
-              </>
-            }
-            </Offcanvas.Body>
-          </Offcanvas>
-        </Container>
-      </Navbar>
+              Clubes
+          </Link>
+
+          {!userData ? 
+            <div 
+              id="login-header-dropdown" 
+              title="Login"
+              className={styles.loginSection}
+            >
+              <button
+                onClick={() => setIsLoginDropdown(!isLoginDropdown)}
+              >Login</button>
+              {isLoginDropdown ?
+                <div 
+                  className={styles.dropdown}
+                  ref={loginDropdownRef}
+                >
+                  <Link href="/login/subscriber">Sou Assinante</Link>
+                  <Link href="/login/club_provider">Sou Clube</Link>
+                </div>
+               :
+               ''
+               }
+            </div>
+           : 
+            <button
+              className={styles.menuToggle}
+              onClick={() => setIsMenuSidebar(!isMenuSidebar)}
+            >
+              <IoMenu fontSize={50} />
+            </button>
+          }
+
+
+          {isMenuSidebar ? 
+            <aside className={styles.sidebarMenu}>
+              <header>
+                {userData && (typeOfUser !== 'subscriber' && (
+                  <h5 className={styles.adminName}>
+                    {userData.clubName ? userData.clubName : clubProviderInfo?.clubName}
+                  </h5>
+                ))}
+                <h4>
+                  Olá, {userData ? userData?.name : 'Faça Login'}
+                </h4>
+                <button 
+                  className={styles.closeMenu}
+                  onClick={() => setIsMenuSidebar(!isMenuSidebar)}
+                >
+                  <IoClose />
+                </button>
+              </header>
+
+              <DivisionLineWithoutMargin />
+
+              <section className={styles.menuContent}>
+                {session.data ?
+                  (
+                    <>
+                      {
+                        typeOfUser === "subscriber" &&
+                        SUBSCRIBER_HEADER_OPTIONS.map(({ text, path }, index) => (
+                          <Link
+                            key={index}
+                            href={path}
+                            className={styles.headerOption}
+                          >
+                            {text}
+                          </Link>)
+                        )
+                      }
+                      {
+                        typeOfUser === "admin" &&
+                        ADMIN_HEADER_OPTIONS.map(({ text, path }, index) => {
+
+                          if(text === "Home" ) path += `${clubProviderInfo?.id}/dashboard`
+                          if(text === "Administradores" ) path += `${clubProviderInfo?.id}/dashboard/admins`
+
+                          return (
+                            <Link
+                              key={index}
+                              href={path}
+                              className={styles.headerOption}
+                            >
+                              {text}
+                            </Link>
+                          )
+                        })
+                      }
+                      <button
+                        className={styles.signOut}
+                        onClick={() => signOut()}
+                      >Sair da Conta</button>
+                    </>
+                  )
+                  :
+                  <>
+                    <Link 
+                      className={styles.headerOption}
+                      href={'/login/subscriber'}
+                    >Fazer Login</Link>
+                    <Link 
+                      className={styles.headerOptionSignInClubProvider}
+                      href={'/login/club_provider'}
+                    >Sou Administrador de um Clube</Link>
+                  </>
+                }
+              </section>
+            </aside>
+          : ''}
+        </nav>
+      </header>
     </>
   )
 }

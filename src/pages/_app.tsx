@@ -3,17 +3,23 @@ import '../styles/theme.scss'
 
 import { SessionProvider } from 'next-auth/react'
 import type { AppProps } from 'next/app'
+import { SSRProvider } from '@react-aria/ssr';
 
 import { useState } from 'react'
 import { Router } from 'next/router'
 
-import { Spinner } from 'react-bootstrap'
-
+import { ClubDashboardGlobalContext } from '../contexts/ClubDashboard/ClubDashboardGlobalContext'
+import { LoaderSpinner } from '../components/Loader'
 import { Header } from '../components/Header'
 
+import { ClubProvider } from '../@types/ClubProviderTypes'
+import Head from 'next/head';
 
-export default function App({ Component, pageProps: {session, ...pageProps} }: AppProps) {
+export default function App({ Component, pageProps: { session, ...pageProps } }: AppProps) {
+
   const [isLoad, setIsLoad] = useState(true)
+  const [clubProviderInfo, setClubProviderInfo] = useState<ClubProvider | null>(null)
+  const [showOnlyAdminsInDashboard, setShowOnlyAdminsInDashboard] = useState<boolean>(false)
 
   Router.events.on("routeChangeStart", (url) => {
     setIsLoad(false)
@@ -22,18 +28,28 @@ export default function App({ Component, pageProps: {session, ...pageProps} }: A
   Router.events.on("routeChangeComplete", (url) => {
     setIsLoad(true)
   })
-  
+
   return (
-    <SessionProvider session={session}>
-      <Header />
-      {isLoad ? 
-        <Component {...pageProps} />
-        : 
-        <section className='w-100 position-relative' style={{'height': '80vh'}}>
-          <Spinner className='position-absolute top-50 start-50' animation="border" />
-        </section>
-      }
-      <footer className='p-5 bg-dark mt-5 text-white'>footer</footer>
-    </SessionProvider>
+    <SSRProvider>
+      <SessionProvider session={session}>
+        <ClubDashboardGlobalContext.Provider value={{
+          clubProviderInfo, setClubProviderInfo,
+          showOnlyAdminsInDashboard, setShowOnlyAdminsInDashboard
+        }}>
+          <Head>
+            <link rel="preconnect" href="https://fonts.googleapis.com" />
+            <link rel="preconnect" href="https://fonts.gstatic.com" />
+            <link href="https://fonts.googleapis.com/css2?family=Golos+Text&display=swap" rel="stylesheet" />
+          </Head>
+          <Header />
+          {isLoad ?
+            <Component {...pageProps} />
+            :
+            <LoaderSpinner />
+          }
+          <footer className='p-5 bg-dark mt-4 text-white'>footer</footer>
+        </ClubDashboardGlobalContext.Provider>
+      </SessionProvider>
+    </SSRProvider>
   )
 }
